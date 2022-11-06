@@ -10,6 +10,36 @@ def gen_custID():
     id = "ID"+"0"*(7-len(custnum))+custnum
     return id
 
+def gen_sellID():
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    cur.execute("UPDATE metadata SET sellnum = sellnum + 1")
+    conn.commit()
+    sellnum = str([i for i in cur.execute("SELECT sellnum FROM metadata")][0][0])
+    conn.close()
+    id = "SID"+"0"*(7-len(sellnum))+sellnum
+    return id
+
+def gen_prodID():
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    cur.execute("UPDATE metadata SET prodnum = prodnum + 1")
+    conn.commit()
+    prodnum = str([i for i in cur.execute("SELECT prodnum FROM metadata")][0][0])
+    conn.close()
+    id = "PID"+"0"*(7-len(prodnum))+prodnum
+    return id
+
+def gen_orderID():
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    cur.execute("UPDATE metadata SET ordernum = ordernum + 1")
+    conn.commit()
+    ordernum = str([i for i in cur.execute("SELECT ordernum FROM metadata")][0][0])
+    conn.close()
+    id = "OID"+"0"*(7-len(ordernum))+ ordernum
+    return id
+
 
 def add_user(data):
     conn = sqlite3.connect("SavestaShop/database.db"")
