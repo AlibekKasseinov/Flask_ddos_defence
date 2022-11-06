@@ -4,7 +4,6 @@ import os
 
 app = Flask(__name__)
 sess = Session()
-
 @app.route("/")
 def home():
     if "userid" in session:
