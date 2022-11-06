@@ -85,24 +85,54 @@ def auth_user(data):
         return False
     return a[0]
 
-def check_psswd(psswd, userid, type):
-    conn = sqlite3.connect("SavestaShop/database.db")
+def fetch_details(userid, type):
+    conn = sqlite3.connect("OnlineShop/onlineshop.db")
     cur = conn.cursor()
     if type=="Customer":
-        a = cur.execute("SELECT password FROM customer WHERE custID=?", (userid,))
+        a = cur.execute("SELECT * FROM customer WHERE custID=?", (userid,))
+        a = list(a)
+        b = []
     elif type=="Seller":
-        a = cur.execute("SELECT password FROM seller WHERE sellID=?", (userid,))
-    real_psswd = list(a)[0][0]
+        a = cur.execute("SELECT * FROM seller WHERE sellID=?", (userid,))
+        a = list(a)
+        b = cur.execute("SELECT DISTINCT(category) from product WHERE sellID=?", (userid,))
+        b = [i[0] for i in b ]
     conn.close()
-    return psswd==real_psswd
+    return a, b
 
-def set_psswd(psswd, userid, type):
-    conn = sqlite3.connect("SavestaShop/database.db")
+def search_users(search, srch_type):
+    conn = sqlite3.connect('OnlineShop/onlineshop.db')
+    cur = conn.cursor()
+    search = "%"+search+"%"
+    if srch_type=="Customer":
+        res = cur.execute("SELECT custID, name, email, phone, area, locality, city, state, country, zipcode FROM customer WHERE LOWER(name) like ?", (search,))
+    elif srch_type=="Seller":
+        res = cur.execute("SELECT sellID, name, email, phone, area, locality, city, state, country, zipcode FROM seller WHERE LOWER(name) like ?", (search,))
+    res = [i for i in res ]
+    conn.close()
+    return res
+
+def update_details(data, userid, type):
+    conn = sqlite3.connect("OnlineShop/onlineshop.db")
     cur = conn.cursor()
     if type=="Customer":
-        a = cur.execute("UPDATE customer SET password=? WHERE custID=?", (psswd, userid))
+        cur.execute("UPDATE customer SET phone=?, area=?, locality=?, city=?, state=?, country=?, zipcode=? where custID=?", (data["phone"],
+                    data["area"],
+                    data["locality"],
+                    data["city"],
+                    data["state"],
+                    data["country"],
+                    data["zip"],
+                    userid))
     elif type=="Seller":
-        a = cur.execute("UPDATE seller SET password=? WHERE sellID=?", (psswd, userid))
+        cur.execute("UPDATE seller SET phone=?, area=?, locality=?, city=?, state=?, country=?, zipcode=? where sellID=?", (data["phone"],
+                    data["area"],
+                    data["locality"],
+                    data["city"],
+                    data["state"],
+                    data["country"],
+                    data["zip"],
+                    userid))
     conn.commit()
     conn.close()
 
@@ -116,7 +146,6 @@ def check_psswd(psswd, userid, type):
     real_psswd = list(a)[0][0]
     conn.close()
     return psswd==real_psswd
-
 def set_psswd(psswd, userid, type):
     conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
