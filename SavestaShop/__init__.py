@@ -123,7 +123,9 @@ def edit_profile():
                                 zip=det[9])
 
 @app.route("/changepassword/", methods=["POST", "GET"])
-    def change_password():
+
+
+def change_password():
         if 'userid' not in session:
             return redirect(url_for('home'))
         check = True

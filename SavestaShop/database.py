@@ -12,7 +12,7 @@ def gen_custID():
 
 
 def add_user(data):
-    conn = sqlite3.connect("OnlineShop/onlineshop.db")
+    conn = sqlite3.connect("SavestaShop/database.db"")
     cur = conn.cursor()
     email = data["email"]
     if data['type']=="Customer":
@@ -40,7 +40,7 @@ def add_user(data):
     return True
 
 def auth_user(data):
-    conn = sqlite3.connect("OnlineShop/onlineshop.db")
+    conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
     type = data["type"]
     email = data["email"]
@@ -56,7 +56,7 @@ def auth_user(data):
     return a[0]
 
 def check_psswd(psswd, userid, type):
-    conn = sqlite3.connect("OnlineShop/onlineshop.db")
+    conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
     if type=="Customer":
         a = cur.execute("SELECT password FROM customer WHERE custID=?", (userid,))
@@ -67,7 +67,7 @@ def check_psswd(psswd, userid, type):
     return psswd==real_psswd
 
 def set_psswd(psswd, userid, type):
-    conn = sqlite3.connect("OnlineShop/onlineshop.db")
+    conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
     if type=="Customer":
         a = cur.execute("UPDATE customer SET password=? WHERE custID=?", (psswd, userid))
