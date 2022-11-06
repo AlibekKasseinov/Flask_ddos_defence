@@ -11,6 +11,15 @@ def home():
         return render_template("home.html", signedin=True, id=session['userid'], name=session['name'], type=session['type'])
     return render_template("home.html", signedin=False)
 
+@app.route("/signup/", methods = ["POST", "GET"])
+def signup():
+    if request.method == "POST":
+        data = request.form
+        ok = add_user(data)
+        if ok:
+            return render_template("success_signup.html")
+        return render_template("signup.html", ok=ok)
+    return render_template("signup.html", ok=True)
 @app.route("/login/", methods=["POST", "GET"])
 def login():
     if request.method == "POST":
