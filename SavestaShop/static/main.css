@@ -50,7 +50,7 @@ ul.headbar li a:hover{
     background-color: rgba(16, 49, 66, 0.507);
 }
 div.nav{
-    position: fixed;
+    position: static;
     display: block;
     top: 5vw;
     margin:-0.7vw;
