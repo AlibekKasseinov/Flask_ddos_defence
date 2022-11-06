@@ -252,6 +252,73 @@ def buy_confirm(id):
     items = ((name, qty, total),)
     return render_template('buy_confirm.html', items=items, total=total)
 
+@app.route("/buy/myorders/")
+def my_orders():
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Seller":
+        abort(403)
+    res = cust_orders(session['userid'])
+    return render_template('my_orders.html', orders=res)
+
+@app.route("/cancel/<orderID>/")
+def cancel_order(orderID):
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    res = get_order_details(orderID)
+    if len(res)==0:
+        abort(404)
+    custID = res[0][0]
+    sellID = res[0][1]
+    status = res[0][2]
+    if session['type']=="Seller" and sellID!=session['userid']:
+        abort(403)
+    if session['type']=="Customer" and custID!=session['userid']:
+        abort(403)
+    if status!="PLACED":
+        abort(404)
+    change_order_status(orderID, "CANCELLED")
+    return redirect(url_for('my_orders')) if session['type']=="Customer" else redirect(url_for('new_orders'))
+
+@app.route("/dispatch/<orderID>/")
+def dispatch_order(orderID):
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Customer":
+        abort(403)
+    res = get_order_details(orderID)
+    if len(res)==0:
+        abort(404)
+    custID = res[0][0]
+    sellID = res[0][1]
+    status = res[0][2]
+    if session['userid']!=sellID:
+        abort(403)
+    if status!="PLACED":
+        abort(404)
+    change_order_status(orderID, "DISPACHED")
+    return redirect(url_for('new_orders'))
+
+@app.route("/recieve/<orderID>/")
+def recieve_order(orderID):
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Seller":
+        abort(403)
+    res = get_order_details(orderID)
+    if len(res)==0:
+        abort(404)
+    custID = res[0][0]
+    sellID = res[0][1]
+    status = res[0][2]
+    if session['userid']!=custID:
+        abort(403)
+    if status!="DISPACHED":
+        abort(404)
+    change_order_status(orderID, "RECIEVED")
+    return redirect(url_for('my_purchases'))
+
+
 app.config['SECRET_KEY'] = os.urandom(17)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
