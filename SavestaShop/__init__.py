@@ -122,6 +122,7 @@ def edit_profile():
                                 country=det[8],
                                 zip=det[9])
 
+
 @app.route("/changepassword/", methods=["POST", "GET"])
 
 
@@ -143,6 +144,113 @@ def change_password():
                     set_psswd(new_psswd, userid, type)
                     return redirect(url_for('home'))
         return render_template("change_password.html", check=check, equal=equal)
+
+@app.route("/sell/", methods=["POST", "GET"])
+def my_products():
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session["type"]=="Customer":
+        abort(403)
+    categories = get_categories(session["userid"])
+    if request.method=="POST":
+        data = request.form
+        srchBy = data["search method"]
+        category = None if srchBy=='by keyword' else data["category"]
+        keyword = data["keyword"]
+        results = search_myproduct(session['userid'], srchBy, category, keyword)
+        return render_template('my_products.html', categories=categories, after_srch=True, results=results)
+    return render_template("my_products.html", categories=categories, after_srch=False)
+
+@app.route("/sell/addproducts/", methods=["POST", "GET"])
+def add_products():
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session["type"]=="Customer":
+        abort(403)
+    if request.method=="POST":
+        data = request.form
+        add_prod(session['userid'],data)
+        return redirect(url_for('my_products'))
+    return render_template("add_products.html")
+
+@app.route("/viewproduct/")
+def view_prod():
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Seller":
+        return redirect(url_for('my_products'))
+    if session['type']=="Customer":
+        return redirect(url_for('buy'))
+
+@app.route("/viewproduct/<id>/")
+def view_product(id):
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    type = session["type"]
+    ispresent, tup = get_product_info(id)
+    if not ispresent:
+        abort(404)
+    (name, quantity, category, cost_price, sell_price, sellID, desp, sell_name) = tup
+    if type=="Seller" and sellID!=session['userid']:
+        abort(403)
+    return render_template('view_product.html', type=type, name=name, quantity=quantity, category=category, cost_price=cost_price, sell_price=sell_price, sell_id=sellID, sell_name=sell_name, desp=desp, prod_id=id)
+
+@app.route("/viewproduct/<id>/edit/", methods=["POST", "GET"])
+def edit_product(id):
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Customer":
+        abort(403)
+    ispresent, tup = get_product_info(id)
+    if not ispresent:
+        abort(404)
+    (name, quantity, category, cost_price, sell_price, sellID, desp, sell_name) = tup
+    if sellID!=session['userid']:
+        abort(403)
+    if request.method=="POST":
+        data = request.form
+        update_product(data, id)
+        return redirect(url_for('view_product', id=id))
+    return render_template('edit_product.html', prodID=id, name=name, qty=quantity, category=category, price=cost_price, desp=desp)
+
+@app.route("/buy/", methods=["POST", "GET"])
+def buy():
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Seller":
+        abort(403)
+    if request.method=="POST":
+        data = request.form
+        srchBy = data["search method"]
+        category = None if srchBy=='by keyword' else data["category"]
+        keyword = data["keyword"]
+        results = search_products(srchBy, category, keyword)
+        return render_template('search_products.html', after_srch=True, results=results)
+    return render_template('search_products.html', after_srch=False)
+
+@app.route("/buy/<id>/confirm/", methods=["POST", "GET"])
+def buy_confirm(id):
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Seller":
+        abort(403)
+    ispresent, tup = get_product_info(id)
+    if not ispresent:
+        abort(404)
+    (name, quantity, category, cost_price, sell_price, sellID, desp, sell_name) = tup
+    if 'total' not in request.args or 'quantity' not in request.args:
+        abort(404)
+    total = request.args['total']
+    qty = request.args['quantity']
+    if request.method=="POST":
+        choice = request.form['choice']
+        if choice=="PLACE ORDER":
+            place_order(id, session['userid'], qty)
+            return redirect(url_for('my_orders'))
+        elif choice=="CANCEL":
+            return redirect(url_for('buy_product', id=id))
+    items = ((name, qty, total),)
+    return render_template('buy_confirm.html', items=items, total=total)
 
 app.config['SECRET_KEY'] = os.urandom(17)
 app.config['SESSION_TYPE'] = 'filesystem'
