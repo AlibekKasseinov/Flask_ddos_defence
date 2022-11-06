@@ -42,7 +42,7 @@ def gen_orderID():
 
 
 def add_user(data):
-    conn = sqlite3.connect("SavestaShop/database.db"")
+    conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
     email = data["email"]
     if data['type']=="Customer":
@@ -86,7 +86,7 @@ def auth_user(data):
     return a[0]
 
 def fetch_details(userid, type):
-    conn = sqlite3.connect("OnlineShop/onlineshop.db")
+    conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
     if type=="Customer":
         a = cur.execute("SELECT * FROM customer WHERE custID=?", (userid,))
@@ -101,7 +101,7 @@ def fetch_details(userid, type):
     return a, b
 
 def search_users(search, srch_type):
-    conn = sqlite3.connect('OnlineShop/onlineshop.db')
+    conn = sqlite3.connect('SavestaShop/database.db')
     cur = conn.cursor()
     search = "%"+search+"%"
     if srch_type=="Customer":
@@ -113,7 +113,7 @@ def search_users(search, srch_type):
     return res
 
 def update_details(data, userid, type):
-    conn = sqlite3.connect("OnlineShop/onlineshop.db")
+    conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
     if type=="Customer":
         cur.execute("UPDATE customer SET phone=?, area=?, locality=?, city=?, state=?, country=?, zipcode=? where custID=?", (data["phone"],
@@ -146,6 +146,7 @@ def check_psswd(psswd, userid, type):
     real_psswd = list(a)[0][0]
     conn.close()
     return psswd==real_psswd
+
 def set_psswd(psswd, userid, type):
     conn = sqlite3.connect("SavestaShop/database.db")
     cur = conn.cursor()
