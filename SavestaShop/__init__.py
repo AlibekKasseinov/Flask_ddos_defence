@@ -122,6 +122,26 @@ def edit_profile():
                                 country=det[8],
                                 zip=det[9])
 
+@app.route("/changepassword/", methods=["POST", "GET"])
+    def change_password():
+        if 'userid' not in session:
+            return redirect(url_for('home'))
+        check = True
+        equal = True
+        if request.method == "POST":
+            userid = session["userid"]
+            type = session["type"]
+            old_psswd = request.form["old_psswd"]
+            new_psswd = request.form["new_psswd"]
+            cnfrm_psswd = request.form["cnfrm_psswd"]
+            check = check_psswd(old_psswd, userid, type)
+            if check:
+                equal = (new_psswd == cnfrm_psswd)
+                if equal:
+                    set_psswd(new_psswd, userid, type)
+                    return redirect(url_for('home'))
+        return render_template("change_password.html", check=check, equal=equal)
+
 app.config['SECRET_KEY'] = os.urandom(17)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
