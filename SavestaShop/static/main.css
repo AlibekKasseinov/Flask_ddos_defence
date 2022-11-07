@@ -3,7 +3,7 @@ div.sticky {
     position: sticky;
     top: 0.2px;
     margin: -0.7vw;
-    background-color:  rgba(3, 22, 32, 0.5);
+    background-color:  rgba(3, 22, 32, 0.6);
     color: white;
     padding: 0.3vw;
     font-size: 1.5vw;
@@ -33,7 +33,7 @@ ul.headbar{
     margin:-0.7vw;
     padding:0;
     overflow: hidden;
-    background-color:  rgba(3, 22, 32, 0.623);
+    background-color:  rgba(3, 22, 32, 0.634);
     border:none;
 }
 ul.headbar li a{
@@ -145,3 +145,13 @@ a{
   text-decoration: underline;
   color: white;
 }
+#footer {
+    position: fixed;
+    left: 0; bottom: 0;
+    color: #fff;
+    width: 100%;
+   }
+#footer div {
+    padding: 10px;
+    background: rgba(3, 22, 32, 0.634);
+   }
