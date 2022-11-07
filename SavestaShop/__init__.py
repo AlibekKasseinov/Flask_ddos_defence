@@ -21,6 +21,7 @@ def signup():
             return render_template("success_signup.html")
         return render_template("signup.html", ok=ok)
     return render_template("signup.html", ok=True)
+
 @app.route("/login/", methods=["POST", "GET"])
 def login():
     if request.method == "POST":
@@ -123,28 +124,25 @@ def edit_profile():
                                 country=det[8],
                                 zip=det[9])
 
-
 @app.route("/changepassword/", methods=["POST", "GET"])
-
-
 def change_password():
-        if 'userid' not in session:
-            return redirect(url_for('home'))
-        check = True
-        equal = True
-        if request.method == "POST":
-            userid = session["userid"]
-            type = session["type"]
-            old_psswd = request.form["old_psswd"]
-            new_psswd = request.form["new_psswd"]
-            cnfrm_psswd = request.form["cnfrm_psswd"]
-            check = check_psswd(old_psswd, userid, type)
-            if check:
-                equal = (new_psswd == cnfrm_psswd)
-                if equal:
-                    set_psswd(new_psswd, userid, type)
-                    return redirect(url_for('home'))
-        return render_template("change_password.html", check=check, equal=equal)
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    check = True
+    equal = True
+    if request.method=="POST":
+        userid = session["userid"]
+        type = session["type"]
+        old_psswd = request.form["old_psswd"]
+        new_psswd = request.form["new_psswd"]
+        cnfrm_psswd = request.form["cnfrm_psswd"]
+        check = check_psswd(old_psswd, userid, type)
+        if check:
+            equal = (new_psswd == cnfrm_psswd)
+            if equal:
+                set_psswd(new_psswd, userid, type)
+                return redirect(url_for('home'))
+    return render_template("change_password.html", check=check, equal=equal)
 
 @app.route("/sell/", methods=["POST", "GET"])
 def my_products():
@@ -228,6 +226,22 @@ def buy():
         results = search_products(srchBy, category, keyword)
         return render_template('search_products.html', after_srch=True, results=results)
     return render_template('search_products.html', after_srch=False)
+
+@app.route("/buy/<id>/", methods=['POST', 'GET'])
+def buy_product(id):
+    if 'userid' not in session:
+        return redirect(url_for('home'))
+    if session['type']=="Seller":
+        abort(403)
+    ispresent, tup = get_product_info(id)
+    if not ispresent:
+        abort(404)
+    (name, quantity, category, cost_price, sell_price, sellID, desp, sell_name) = tup
+    if request.method=="POST":
+        data = request.form
+        total = int(data['qty'])*float(sell_price)
+        return redirect(url_for('buy_confirm', total=total, quantity=data['qty'], id=id))
+    return render_template('buy_product.html', name=name, category=category, desp=desp, quantity=quantity, price=sell_price)
 
 @app.route("/buy/<id>/confirm/", methods=["POST", "GET"])
 def buy_confirm(id):
@@ -409,7 +423,6 @@ def delete_prod_cart(prodID):
         abort(403)
     remove_from_cart(session['userid'], prodID)
     return redirect(url_for('my_cart'))
-
 
 
 app.config['SECRET_KEY'] = os.urandom(17)
