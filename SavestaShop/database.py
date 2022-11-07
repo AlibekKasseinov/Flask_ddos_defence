@@ -156,3 +156,115 @@ def set_psswd(psswd, userid, type):
         a = cur.execute("UPDATE seller SET password=? WHERE sellID=?", (psswd, userid))
     conn.commit()
     conn.close()
+
+def add_prod(sellID, data):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    prodID = gen_prodID()
+    tup = (prodID,
+           data["name"],
+           data["qty"],
+           data["category"],
+           data["price"],
+           data["price"],
+           data["desp"],
+           sellID)
+    cur.execute("INSERT INTO product VALUES (?,?,?,?,?,(SELECT profit_rate from metadata)*?,?,?)", tup)
+    conn.commit()
+    conn.close()
+
+def get_categories(sellID):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    a = cur.execute("SELECT DISTINCT(category) from product where sellID=?", (sellID,))
+    categories = [i[0] for i in a]
+    conn.close()
+    return categories
+
+def search_myproduct(sellID, srchBy, category, keyword):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor() #cursor
+    keyword = ['%'+i+'%' for i in keyword.split()]
+    if len(keyword)==0: keyword.append('%%')
+    if srchBy=="by category":
+        a = cur.execute("""SELECT prodID, name, quantity, category, cost_price
+                        FROM product WHERE category=? AND sellID=? """,(category, sellID))
+        res = [i for i in a]
+    elif srchBy=="by keyword":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, quantity, category, cost_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ? OR category LIKE ?) AND sellID=? """,
+                            (word, word, word, sellID))
+            res += list(a)
+        res = list(set(res))
+    elif srchBy=="both":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, quantity, category, cost_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ?) AND sellID=? AND category=? """,
+                            (word, word, sellID, category))
+            res += list(a)
+        res = list(set(res))
+    conn.close()
+    return res
+
+def get_product_info(id):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    a = cur.execute("""SELECT p.name, p.quantity, p.category, p.cost_price, p.sell_price,
+                    p.sellID, p.description, s.name FROM product p JOIN seller s
+                    WHERE p.sellID=s.sellID AND p.prodID=? """, (id,))
+    res = [i for i in a]
+    conn.close()
+    if len(res)==0:
+        return False, res
+    return True, res[0]
+
+def update_product(data, id):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    cur.execute("""UPDATE product
+    SET name=?, quantity=?, category=?, cost_price=?,
+    sell_price=(SELECT profit_rate from metadata)*?, description=?
+    where prodID=?""",( data['name'],
+                        data['qty'],
+                        data['category'],
+                        data['price'],
+                        data['price'],
+                        data['desp'],
+                        id))
+    conn.commit()
+    conn.close()
+
+def search_products(srchBy, category, keyword):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    keyword = ['%'+i+'%' for i in keyword.split()]
+    if len(keyword)==0: keyword.append('%%')
+    if srchBy=="by category":
+        a = cur.execute("""SELECT prodID, name, category, sell_price
+                        FROM product WHERE category=? AND quantity!=0 """,(category,))
+        res = [i for i in a]
+    elif srchBy=="by keyword":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, category, sell_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ? OR category LIKE ?) AND quantity!=0 """,
+                            (word, word, word))
+            res += list(a)
+        res = list(set(res))
+    elif srchBy=="both":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, category, sell_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ?) AND quantity!=0 AND category=? """,
+                            (word, word, category))
+            res += list(a)
+        res = list(set(res))
+    conn.close()
+    return res
