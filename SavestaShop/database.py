@@ -156,3 +156,251 @@ def set_psswd(psswd, userid, type):
         a = cur.execute("UPDATE seller SET password=? WHERE sellID=?", (psswd, userid))
     conn.commit()
     conn.close()
+
+def add_prod(sellID, data):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    prodID = gen_prodID()
+    tup = (prodID,
+           data["name"],
+           data["qty"],
+           data["category"],
+           data["price"],
+           data["price"],
+           data["desp"],
+           sellID)
+    cur.execute("INSERT INTO product VALUES (?,?,?,?,?,(SELECT profit_rate from metadata)*?,?,?)", tup)
+    conn.commit()
+    conn.close()
+
+def get_categories(sellID):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    a = cur.execute("SELECT DISTINCT(category) from product where sellID=?", (sellID,))
+    categories = [i[0] for i in a]
+    conn.close()
+    return categories
+
+def search_myproduct(sellID, srchBy, category, keyword):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor() #cursor
+    keyword = ['%'+i+'%' for i in keyword.split()]
+    if len(keyword)==0: keyword.append('%%')
+    if srchBy=="by category":
+        a = cur.execute("""SELECT prodID, name, quantity, category, cost_price
+                        FROM product WHERE category=? AND sellID=? """,(category, sellID))
+        res = [i for i in a]
+    elif srchBy=="by keyword":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, quantity, category, cost_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ? OR category LIKE ?) AND sellID=? """,
+                            (word, word, word, sellID))
+            res += list(a)
+        res = list(set(res))
+    elif srchBy=="both":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, quantity, category, cost_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ?) AND sellID=? AND category=? """,
+                            (word, word, sellID, category))
+            res += list(a)
+        res = list(set(res))
+    conn.close()
+    return res
+
+def get_product_info(id):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    a = cur.execute("""SELECT p.name, p.quantity, p.category, p.cost_price, p.sell_price,
+                    p.sellID, p.description, s.name FROM product p JOIN seller s
+                    WHERE p.sellID=s.sellID AND p.prodID=? """, (id,))
+    res = [i for i in a]
+    conn.close()
+    if len(res)==0:
+        return False, res
+    return True, res[0]
+
+def update_product(data, id):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    cur.execute("""UPDATE product
+    SET name=?, quantity=?, category=?, cost_price=?,
+    sell_price=(SELECT profit_rate from metadata)*?, description=?
+    where prodID=?""",( data['name'],
+                        data['qty'],
+                        data['category'],
+                        data['price'],
+                        data['price'],
+                        data['desp'],
+                        id))
+    conn.commit()
+    conn.close()
+
+def search_products(srchBy, category, keyword):
+    conn = sqlite3.connect("SavestaShop/database.db")
+    cur = conn.cursor()
+    keyword = ['%'+i+'%' for i in keyword.split()]
+    if len(keyword)==0: keyword.append('%%')
+    if srchBy=="by category":
+        a = cur.execute("""SELECT prodID, name, category, sell_price
+                        FROM product WHERE category=? AND quantity!=0 """,(category,))
+        res = [i for i in a]
+    elif srchBy=="by keyword":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, category, sell_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ? OR category LIKE ?) AND quantity!=0 """,
+                            (word, word, word))
+            res += list(a)
+        res = list(set(res))
+    elif srchBy=="both":
+        res = []
+        for word in keyword:
+            a = cur.execute("""SELECT prodID, name, category, sell_price
+                            FROM product
+                            WHERE (name LIKE ? OR description LIKE ?) AND quantity!=0 AND category=? """,
+                            (word, word, category))
+            res += list(a)
+        res = list(set(res))
+    conn.close()
+    return res
+
+def get_seller_products(sellID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    a = cur.execute("SELECT prodID, name, category, sell_price FROM product WHERE sellID=? AND quantity!=0", (sellID,))
+    res = [i for i in a]
+    conn.close()
+    return res
+
+def place_order(prodID, custID, qty):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    orderID = gen_orderID()
+    cur.execute("""INSERT INTO orders
+                    SELECT ?,?,?,?,datetime('now'), cost_price*?, sell_price*?, 'PLACED'
+                    FROM product WHERE prodID=? """, (orderID, custID, prodID, qty, qty, qty, prodID))
+    conn.commit()
+    conn.close()
+
+def cust_orders(custID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    a = cur.execute("""SELECT o.orderID, o.prodID, p.name, o.quantity, o.sell_price, o.date, o.status
+                       FROM orders o JOIN product p
+                       WHERE o.prodID=p.prodID AND o.custID=? AND o.status!='RECIEVED'
+                       ORDER BY o.date DESC """, (custID,))
+    res = [i for i in a]
+    conn.close()
+    return res
+
+def sell_orders(sellID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    a = cur.execute(""" SELECT o.orderID, o.prodID, p.name, o.quantity, p.quantity, o.cost_price, o.date, o.status
+                        FROM orders o JOIN product p
+                        WHERE o.prodID=p.prodID AND p.sellID=? AND o.status!='RECIEVED'
+                        ORDER BY o.date DESC """, (sellID,))
+    res = [i for i in a]
+    conn.close()
+    return res
+
+def get_order_details(orderID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    a = cur.execute(""" SELECT o.custID, p.sellID, o.status FROM orders o JOIN product p
+                        WHERE o.orderID=? AND o.prodID=p.prodID """, (orderID,))
+    res = [i for i in a]
+    conn.close()
+    return res
+
+def change_order_status(orderID, new_status):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    cur.execute("UPDATE orders SET status=? WHERE orderID=? ", (new_status, orderID))
+    if new_status=='DISPACHED':
+        cur.execute("""UPDATE product SET
+                     quantity=quantity-(SELECT quantity FROM orders WHERE orderID=? )
+                     WHERE prodID=(SELECT prodID FROM orders WHERE orderID=? )""", (orderID, orderID))
+    conn.commit()
+    conn.close()
+
+def cust_purchases(custID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    a = cur.execute("""SELECT o.prodID, p.name, o.quantity, o.sell_price, o.date
+                       FROM orders o JOIN product p
+                       WHERE o.prodID=p.prodID AND o.custID=? AND o.status='RECIEVED'
+                       ORDER BY o.date DESC """, (custID,))
+    res = [i for i in a]
+    conn.close()
+    return res
+
+def sell_sales(sellID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    a = cur.execute("""SELECT o.prodID, p.name, o.quantity, o.sell_price, o.date, o.custID, c.name
+                       FROM orders o JOIN product p JOIN customer c
+                       WHERE o.prodID=p.prodID AND o.custID=c.custID AND p.sellID=? AND o.status='RECIEVED'
+                       ORDER BY o.date DESC """, (sellID,))
+    res = [i for i in a]
+    conn.close()
+    return res
+
+def add_product_to_cart(prodID, custID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    cur.execute("""INSERT INTO cart VALUES (?,?,1) """, (custID, prodID))
+    conn.commit()
+    conn.close()
+
+def get_cart(custID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    a = cur.execute("""SELECT p.prodID, p.name, p.sell_price, c.sum_qty, p.quantity
+                       FROM (SELECT custID, prodID, SUM(quantity) AS sum_qty FROM cart
+                       GROUP BY custID, prodID) c JOIN product p
+                       WHERE p.prodID=c.prodID AND c.custID=?""", (custID,))
+    res = [i for i in a]
+    conn.close()
+    return res
+
+def update_cart(custID, qty):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    for prodID in qty:
+        cur.execute("DELETE FROM cart WHERE prodID=? AND custID=?", (prodID, custID))
+        cur.execute("INSERT INTO cart VALUES (?,?,?)", (custID, prodID, qty[prodID]))
+    conn.commit()
+    conn.close()
+
+def cart_purchase(custID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    cart = get_cart(custID)
+    for item in cart:
+        orderID = gen_orderID()
+        prodID = item[0]
+        qty = item[3]
+        cur.execute("""INSERT INTO orders
+                        SELECT ?,?,?,?,datetime('now'), cost_price*?, sell_price*?, 'PLACED'
+                        FROM product WHERE prodID=? """, (orderID, custID, prodID, qty, qty, qty, prodID))
+        cur.execute("DELETE FROM cart WHERE custID=? AND prodID=?", (custID, prodID))
+        conn.commit()
+    conn.close()
+
+def empty_cart(custID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cart WHERE custID=?", (custID,))
+    conn.commit()
+
+def remove_from_cart(custID, prodID):
+    conn = sqlite3.connect('SavestaShop/database.db')
+    cur = conn.cursor()
+    cur.execute("DELETE FROM cart WHERE custID=? AND prodID=?", (custID, prodID))
+    conn.commit()
