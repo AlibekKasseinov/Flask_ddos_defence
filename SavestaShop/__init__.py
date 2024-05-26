@@ -2,9 +2,35 @@ from flask import Flask, render_template, request, url_for, redirect, abort, ses
 from flask_session import Session
 from SavestaShop.database import *
 import os
+import time
 
 app = Flask(__name__)
 sess = Session()
+
+# Настройки
+REQUEST_LIMIT = 100  # Максимальное количество запросов от одного IP за определенный период
+TIME_WINDOW = 60  # Временное окно в секундах
+
+# Хранилище данных о запросах
+request_counts = {}
+
+@app.before_request
+def limit_remote_addr():
+    current_time = time.time()
+    ip = request.remote_addr
+
+    if ip not in request_counts:
+        request_counts[ip] = []
+
+    # Удаление устаревших запросов
+    request_counts[ip] = [timestamp for timestamp in request_counts[ip] if current_time - timestamp < TIME_WINDOW]
+
+    # Добавление текущего запроса
+    request_counts[ip].append(current_time)
+
+    # Проверка количества запросов
+    if len(request_counts[ip]) > REQUEST_LIMIT:
+        return "Too many requests", 429
 
 @app.route("/")
 def home():
@@ -12,7 +38,7 @@ def home():
         return render_template("home.html", signedin=True, id=session['userid'], name=session['name'], type=session['type'])
     return render_template("home.html", signedin=False)
 
-@app.route("/signup/", methods = ["POST", "GET"])
+@app.route("/signup/", methods=["POST", "GET"])
 def signup():
     if request.method == "POST":
         data = request.form
@@ -48,34 +74,36 @@ def view_profile(id):
         return redirect(url_for('home'))
     userid = session["userid"]
     type = session["type"]
-    my = True if userid==id else False
-    if not my: profile_type = "Customer" if type=="Seller" else "Seller"
-    else: profile_type = type
+    my = True if userid == id else False
+    if not my:
+        profile_type = "Customer" if type == "Seller" else "Seller"
+    else:
+        profile_type = type
 
-    det, categories = fetch_details(id, profile_type)   #details
-    if len(det)==0:
+    det, categories = fetch_details(id, profile_type)   # details
+    if len(det) == 0:
         abort(404)
     det = det[0]
     return render_template("view_profile.html",
-                            type=profile_type,
-                            name=det[1],
-                            email=det[2],
-                            phone=det[3],
-                            area=det[4],
-                            locality=det[5],
-                            city=det[6],
-                            state=det[7],
-                            country=det[8],
-                            zip=det[9],
-                            category=(None if profile_type=="Customer" else categories),
-                            my=my)
+                           type=profile_type,
+                           name=det[1],
+                           email=det[2],
+                           phone=det[3],
+                           area=det[4],
+                           locality=det[5],
+                           city=det[6],
+                           state=det[7],
+                           country=det[8],
+                           zip=det[9],
+                           category=(None if profile_type == "Customer" else categories),
+                           my=my)
 
 @app.route("/viewprofile/", methods=["POST", "GET"])
 def profile():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    type = "Seller" if session['type']=="Customer" else "Customer"
-    if request.method=="POST":
+    type = "Seller" if session['type'] == "Customer" else "Customer"
+    if request.method == "POST":
         search = request.form['search']
         results = search_users(search, type)
         found = len(results)
@@ -87,13 +115,13 @@ def profile():
 def seller_products(id):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session["type"]=="Seller":
+    if session["type"] == "Seller":
         abort(403)
-    det, categories = fetch_details(id, "Seller")   #details
-    if len(det)==0:
+    det, categories = fetch_details(id, "Seller")   # details
+    if len(det) == 0:
         abort(404)
     det = det[0]
-    name=det[1]
+    name = det[1]
     res = get_seller_products(id)
     return render_template('seller_products.html', name=name, id=id, results=res)
 
@@ -102,27 +130,27 @@ def edit_profile():
     if 'userid' not in session:
         return redirect(url_for('home'))
 
-    if request.method=="POST":
+    if request.method == "POST":
         data = request.form
         update_details(data, session['userid'], session['type'])
         return redirect(url_for('view_profile', id=session['userid']))
 
-    if request.method=="GET":
+    if request.method == "GET":
         userid = session["userid"]
         type = session["type"]
         det, _ = fetch_details(userid, type)
         det = det[0]
         return render_template("edit_profile.html",
-                                type=type,
-                                name=det[1],
-                                email=det[2],
-                                phone=det[3],
-                                area=det[4],
-                                locality=det[5],
-                                city=det[6],
-                                state=det[7],
-                                country=det[8],
-                                zip=det[9])
+                               type=type,
+                               name=det[1],
+                               email=det[2],
+                               phone=det[3],
+                               area=det[4],
+                               locality=det[5],
+                               city=det[6],
+                               state=det[7],
+                               country=det[8],
+                               zip=det[9])
 
 @app.route("/changepassword/", methods=["POST", "GET"])
 def change_password():
@@ -130,7 +158,7 @@ def change_password():
         return redirect(url_for('home'))
     check = True
     equal = True
-    if request.method=="POST":
+    if request.method == "POST":
         userid = session["userid"]
         type = session["type"]
         old_psswd = request.form["old_psswd"]
@@ -148,13 +176,13 @@ def change_password():
 def my_products():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session["type"]=="Customer":
+    if session["type"] == "Customer":
         abort(403)
     categories = get_categories(session["userid"])
-    if request.method=="POST":
+    if request.method == "POST":
         data = request.form
         srchBy = data["search method"]
-        category = None if srchBy=='by keyword' else data["category"]
+        category = None if srchBy == 'by keyword' else data["category"]
         keyword = data["keyword"]
         results = search_myproduct(session['userid'], srchBy, category, keyword)
         return render_template('my_products.html', categories=categories, after_srch=True, results=results)
@@ -164,11 +192,11 @@ def my_products():
 def add_products():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session["type"]=="Customer":
+    if session["type"] == "Customer":
         abort(403)
-    if request.method=="POST":
+    if request.method == "POST":
         data = request.form
-        add_prod(session['userid'],data)
+        add_prod(session['userid'], data)
         return redirect(url_for('my_products'))
     return render_template("add_products.html")
 
@@ -176,9 +204,9 @@ def add_products():
 def view_prod():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         return redirect(url_for('my_products'))
-    if session['type']=="Customer":
+    if session['type'] == "Customer":
         return redirect(url_for('buy'))
 
 @app.route("/viewproduct/<id>/")
@@ -190,7 +218,7 @@ def view_product(id):
     if not ispresent:
         abort(404)
     (name, quantity, category, cost_price, sell_price, sellID, desp, sell_name) = tup
-    if type=="Seller" and sellID!=session['userid']:
+    if type == "Seller" and sellID != session['userid']:
         abort(403)
     return render_template('view_product.html', type=type, name=name, quantity=quantity, category=category, cost_price=cost_price, sell_price=sell_price, sell_id=sellID, sell_name=sell_name, desp=desp, prod_id=id)
 
@@ -198,15 +226,15 @@ def view_product(id):
 def edit_product(id):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Customer":
+    if session['type'] == "Customer":
         abort(403)
     ispresent, tup = get_product_info(id)
     if not ispresent:
         abort(404)
     (name, quantity, category, cost_price, sell_price, sellID, desp, sell_name) = tup
-    if sellID!=session['userid']:
+    if sellID != session['userid']:
         abort(403)
-    if request.method=="POST":
+    if request.method == "POST":
         data = request.form
         update_product(data, id)
         return redirect(url_for('view_product', id=id))
@@ -216,12 +244,12 @@ def edit_product(id):
 def buy():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
-    if request.method=="POST":
+    if request.method == "POST":
         data = request.form
         srchBy = data["search method"]
-        category = None if srchBy=='by keyword' else data["category"]
+        category = None if srchBy == 'by keyword' else data["category"]
         keyword = data["keyword"]
         results = search_products(srchBy, category, keyword)
         return render_template('search_products.html', after_srch=True, results=results)
@@ -231,15 +259,15 @@ def buy():
 def buy_product(id):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
     ispresent, tup = get_product_info(id)
     if not ispresent:
         abort(404)
     (name, quantity, category, cost_price, sell_price, sellID, desp, sell_name) = tup
-    if request.method=="POST":
+    if request.method == "POST":
         data = request.form
-        total = int(data['qty'])*float(sell_price)
+        total = int(data['qty']) * float(sell_price)
         return redirect(url_for('buy_confirm', total=total, quantity=data['qty'], id=id))
     return render_template('buy_product.html', name=name, category=category, desp=desp, quantity=quantity, price=sell_price)
 
@@ -247,7 +275,7 @@ def buy_product(id):
 def buy_confirm(id):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
     ispresent, tup = get_product_info(id)
     if not ispresent:
@@ -257,12 +285,12 @@ def buy_confirm(id):
         abort(404)
     total = request.args['total']
     qty = request.args['quantity']
-    if request.method=="POST":
+    if request.method == "POST":
         choice = request.form['choice']
-        if choice=="PLACE ORDER":
+        if choice == "PLACE ORDER":
             place_order(id, session['userid'], qty)
             return redirect(url_for('my_orders'))
-        elif choice=="CANCEL":
+        elif choice == "CANCEL":
             return redirect(url_for('buy_product', id=id))
     items = ((name, qty, total),)
     return render_template('buy_confirm.html', items=items, total=total)
@@ -271,7 +299,7 @@ def buy_confirm(id):
 def my_orders():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
     res = cust_orders(session['userid'])
     return render_template('my_orders.html', orders=res)
@@ -281,35 +309,35 @@ def cancel_order(orderID):
     if 'userid' not in session:
         return redirect(url_for('home'))
     res = get_order_details(orderID)
-    if len(res)==0:
+    if len(res) == 0:
         abort(404)
     custID = res[0][0]
     sellID = res[0][1]
     status = res[0][2]
-    if session['type']=="Seller" and sellID!=session['userid']:
+    if session['type'] == "Seller" and sellID != session['userid']:
         abort(403)
-    if session['type']=="Customer" and custID!=session['userid']:
+    if session['type'] == "Customer" and custID != session['userid']:
         abort(403)
-    if status!="PLACED":
+    if status != "PLACED":
         abort(404)
     change_order_status(orderID, "CANCELLED")
-    return redirect(url_for('my_orders')) if session['type']=="Customer" else redirect(url_for('new_orders'))
+    return redirect(url_for('my_orders')) if session['type'] == "Customer" else redirect(url_for('new_orders'))
 
 @app.route("/dispatch/<orderID>/")
 def dispatch_order(orderID):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Customer":
+    if session['type'] == "Customer":
         abort(403)
     res = get_order_details(orderID)
-    if len(res)==0:
+    if len(res) == 0:
         abort(404)
     custID = res[0][0]
     sellID = res[0][1]
     status = res[0][2]
-    if session['userid']!=sellID:
+    if session['userid'] != sellID:
         abort(403)
-    if status!="PLACED":
+    if status != "PLACED":
         abort(404)
     change_order_status(orderID, "DISPACHED")
     return redirect(url_for('new_orders'))
@@ -318,17 +346,17 @@ def dispatch_order(orderID):
 def recieve_order(orderID):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
     res = get_order_details(orderID)
-    if len(res)==0:
+    if len(res) == 0:
         abort(404)
     custID = res[0][0]
     sellID = res[0][1]
     status = res[0][2]
-    if session['userid']!=custID:
+    if session['userid'] != custID:
         abort(403)
-    if status!="DISPACHED":
+    if status != "DISPACHED":
         abort(404)
     change_order_status(orderID, "RECIEVED")
     return redirect(url_for('my_purchases'))
@@ -337,7 +365,7 @@ def recieve_order(orderID):
 def my_purchases():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
     res = cust_purchases(session['userid'])
     return render_template('my_purchases.html', purchases=res)
@@ -346,7 +374,7 @@ def my_purchases():
 def new_orders():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Customer":
+    if session['type'] == "Customer":
         abort(403)
     res = sell_orders(session['userid'])
     return render_template('new_orders.html', orders=res)
@@ -355,7 +383,7 @@ def new_orders():
 def my_sales():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Customer":
+    if session['type'] == "Customer":
         abort(403)
     res = sell_sales(session['userid'])
     return render_template('my_sales.html', sales=res)
@@ -364,15 +392,15 @@ def my_sales():
 def my_cart():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
     cart = get_cart(session['userid'])
-    if request.method=="POST":
+    if request.method == "POST":
         data = request.form
         qty = {}
         for i in data:
             if i.startswith("qty"):
-                qty[i[3:]]=data[i]      #qty[prodID]=quantity
+                qty[i[3:]] = data[i]      # qty[prodID]=quantity
         update_cart(session['userid'], qty)
         return redirect("/buy/cart/confirm/")
     return render_template('my_cart.html', cart=cart)
@@ -381,27 +409,27 @@ def my_cart():
 def cart_purchase_confirm():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
-    if request.method=="POST":
+    if request.method == "POST":
         choice = request.form['choice']
-        if choice=="PLACE ORDER":
+        if choice == "PLACE ORDER":
             cart_purchase(session['userid'])
             return redirect(url_for('my_orders'))
-        elif choice=="CANCEL":
+        elif choice == "CANCEL":
             return redirect(url_for('my_cart'))
     cart = get_cart(session['userid'])
-    items = [(i[1], i[3], float(i[2])*float(i[3])) for i in cart]
+    items = [(i[1], i[3], float(i[2]) * float(i[3])) for i in cart]
     total = 0
     for i in cart:
-        total += float(i[2])*int(i[3])
+        total += float(i[2]) * int(i[3])
     return render_template('buy_confirm.html', items=items, total=total)
 
 @app.route("/buy/cart/<prodID>/")
 def add_to_cart(prodID):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['type']=="Seller":
+    if session['type'] == "Seller":
         abort(403)
     add_product_to_cart(prodID, session['userid'])
     return redirect(url_for('view_product', id=prodID))
@@ -410,7 +438,7 @@ def add_to_cart(prodID):
 def delete_cart():
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['userid']=="Seller":
+    if session['userid'] == "Seller":
         abort(403)
     empty_cart(session['userid'])
     return redirect(url_for('my_cart'))
@@ -419,7 +447,7 @@ def delete_cart():
 def delete_prod_cart(prodID):
     if 'userid' not in session:
         return redirect(url_for('home'))
-    if session['userid']=="Seller":
+    if session['userid'] == "Seller":
         abort(403)
     remove_from_cart(session['userid'], prodID)
     return redirect(url_for('my_cart'))
@@ -429,5 +457,6 @@ app.config['SECRET_KEY'] = os.urandom(17)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 sess.init_app(app)
-if __name__=="__main__":
-	app.run(hostname='192.168.43.163')
+
+if __name__ == "__main__":
+    app.run(host='0.0.0.0')
