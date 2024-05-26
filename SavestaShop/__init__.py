@@ -3,6 +3,8 @@ from flask_session import Session
 from SavestaShop.database import *
 import os
 import time
+import pandas as pd
+import pickle
 
 app = Flask(__name__)
 sess = Session()
@@ -13,11 +15,28 @@ TIME_WINDOW = 60  # Временное окно в секундах
 
 # Хранилище данных о запросах
 request_counts = {}
+log_data = []
+
+# Загрузка модели
+model = None
+X_columns = None
+if os.path.exists('ddos_model.pkl'):
+    with open('ddos_model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    X_columns = pd.read_csv('features.csv').columns
 
 @app.before_request
-def limit_remote_addr():
+def log_and_check_request():
     current_time = time.time()
     ip = request.remote_addr
+
+    request_data = {
+        "ip": ip,
+        "endpoint": request.endpoint,
+        "method": request.method,
+        "timestamp": current_time
+    }
+    log_data.append(request_data)
 
     if ip not in request_counts:
         request_counts[ip] = []
@@ -31,6 +50,20 @@ def limit_remote_addr():
     # Проверка количества запросов
     if len(request_counts[ip]) > REQUEST_LIMIT:
         return "Too many requests", 429
+
+    if model and X_columns is not None:
+        # Препроцессинг данных для модели
+        df = pd.DataFrame([request_data])
+        df = pd.get_dummies(df, columns=['ip', 'endpoint', 'method'])
+        missing_cols = set(X_columns) - set(df.columns)
+        for c in missing_cols:
+            df[c] = 0
+        df = df[X_columns]
+
+        # Предсказание с использованием модели
+        prediction = model.predict(df)[0]
+        if prediction == 1:  # Если запрос определяется как DDoS
+            return "DDoS detected", 403
 
 @app.route("/")
 def home():
@@ -452,6 +485,12 @@ def delete_prod_cart(prodID):
     remove_from_cart(session['userid'], prodID)
     return redirect(url_for('my_cart'))
 
+
+@app.route("/save_logs", methods=["GET"])
+def save_logs():
+    df = pd.DataFrame(log_data)
+    df.to_csv('log_data.csv', index=False)
+    return "Logs saved", 200
 
 app.config['SECRET_KEY'] = os.urandom(17)
 app.config['SESSION_TYPE'] = 'filesystem'
